@@ -1,7 +1,7 @@
 #include "random.h"
 #include <stdio.h>
 
-const Hardware get_hardware(){
+const Hardware hardware::get(){
   cudaDeviceProp prop;
   cudaGetDeviceProperties( &prop, 0);
   printf("name: %s\n", prop.name);

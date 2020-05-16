@@ -3,14 +3,14 @@
 
 #define LARGEST_U_INT64 0x1p64 //=2^64
 
-const Hardware HARDWARE = get_hardware();
-
-//Middle Square Weyl Sequence PRNG for seeds (note that it is intended to return uint32_t)
-const uint64_t WEYL_CONST = 0xb5ad4eceda1ce2a9;
+const Hardware HARDWARE = hardware::get();
 
 inline int round_up_division(int dividend, int divisor) {
   return 1+(1-dividend)/divisor;
 }
+
+//Middle Square Weyl Sequence PRNG for seeds (note that it is intended to return uint32_t)
+const uint64_t WEYL_CONST = 0xb5ad4eceda1ce2a9;
 
 inline static uint64_t msws(uint64_t* x, uint64_t* w){
  (*x) *= (*x);
@@ -56,48 +56,54 @@ __global__ void r_Exp(
   double* result
 )
 {
- int idx = blockIdx.x * blockDim.x + threadIdx.x;
- double* result_slice;
- if(idx < residual_threads) {
-   result_slice = result + idx*(cycles+1);
- } else {
-   result_slice = result + idx*cycles + residual_threads;
- }
- uint64_t* seed_slice = seeds + 2*idx;
- uint64_t local_seed[2] = {seed_slice[0], seed_slice[1]};
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  double* result_slice;
+  if(idx < residual_threads) {
+    result_slice = result + idx*(cycles+1);
+  } else {
+    result_slice = result + idx*cycles + residual_threads;
+  }
+  uint64_t* seed_slice = seeds + 2*idx;
+  uint64_t local_seed[2] = {seed_slice[0], seed_slice[1]};
 
- zip_r_exp(cycles, lambda, local_seed, result_slice);
- 
- seed_slice[0]=local_seed[0];
- seed_slice[1]=local_seed[1];
+  zip_r_exp(cycles, lambda, local_seed, result_slice);
+
+  // handle residual threads
+  if(idx < residual_threads) {
+    result_slice[cycles] = r_exp(lambda, r_unif(local_seed));
+  }
+  seed_slice[0]=local_seed[0];
+  seed_slice[1]=local_seed[1];
 }
 
-void gpu_r_exp(int number, double lambda, double** result, uint64_t **d_rng_state) {
-  int threads_per_block = HARDWARE.min_threads_block_full_use;
-  int blocks = HARDWARE.min_blocks_full_use;
-  int par_threads = HARDWARE.min_threads_full_use;
-  
-  int seed_bytes = 2* par_threads * sizeof(uint64_t);
-  if(*d_rng_state == NULL) {
-    uint64_t *seeds;
-    seeds = (uint64_t*) malloc(seed_bytes);
-    generate_seeds(2*par_threads, seeds);
-    cudaMalloc((void**) d_rng_state, seed_bytes);
-    cudaMemcpy(*d_rng_state, seeds, seed_bytes, cudaMemcpyHostToDevice);
-    free(seeds);
+namespace rng{
+  void gpu_r_exp(int number, double lambda, double** result, uint64_t **d_rng_state) {
+    int threads_per_block = HARDWARE.min_threads_block_full_use;
+    int blocks = HARDWARE.min_blocks_full_use;
+    int par_threads = HARDWARE.min_threads_full_use;
+
+    int seed_bytes = 2* par_threads * sizeof(uint64_t);
+    if(*d_rng_state == NULL) {
+      uint64_t *seeds;
+      seeds = (uint64_t*) malloc(seed_bytes);
+      generate_seeds(2*par_threads, seeds);
+      cudaMalloc((void**) d_rng_state, seed_bytes);
+      cudaMemcpy(*d_rng_state, seeds, seed_bytes, cudaMemcpyHostToDevice);
+      free(seeds);
+    }
+
+    int result_bytes = number * sizeof(double);
+    *result = (double*) malloc(result_bytes);
+
+    int cycles = number/par_threads;
+    int residual_threads = number%par_threads;
+
+    double *d_result; 
+    cudaMalloc((void**) &d_result, result_bytes);   
+
+    r_Exp <<<blocks, threads_per_block>>> (cycles, residual_threads, lambda, *d_rng_state, d_result);
+
+    cudaMemcpy(*result, d_result, result_bytes, cudaMemcpyDeviceToHost);
+    cudaFree(d_result);
   }
-  
-  int result_bytes = number * sizeof(double);
-  *result = (double*) malloc(result_bytes);
-
-  int cycles = number/par_threads;
-  int residual_threads = number%par_threads;
-
-  double *d_result; 
-  cudaMalloc((void**) &d_result, result_bytes);   
-
-  r_Exp <<<blocks, threads_per_block>>> (cycles, residual_threads, lambda, *d_rng_state, d_result);
-
-  cudaMemcpy(*result, d_result, result_bytes, cudaMemcpyDeviceToHost);
-  cudaFree(d_result);
 }

@@ -19,13 +19,6 @@ int input_handler(int argc, char *argv[]){
   } 
 }
 
-double mean(double* x, int len){
-  long double result = 0;
-  for(int ii=0; ii<len; ii++) {
-    result+= (long double) x[ii]/((double) len);
-  }
-  return (double) result;
-}
 
 int main(int argc, char *argv[]){
   int number = input_handler(argc, argv);
@@ -34,10 +27,9 @@ int main(int argc, char *argv[]){
   double *result;
   uint64_t *d_rng_state = NULL;
 
-  gpu_r_exp(number, lambda, &result, &d_rng_state);
+  rng::gpu_r_exp(number, lambda, &result, &d_rng_state);
 
-
-  printf("mean: %f\n", mean(result, number));
+  test::statistical_exp_tests(result, number, lambda);
 
   free(result);
   cudaFree(d_rng_state);
