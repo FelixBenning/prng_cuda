@@ -17,11 +17,18 @@ inline static uint64_t msws(uint64_t* x, uint64_t* w){
  (*x) += ((*w) += WEYL_CONST);
  return (*x) = ((*x)>>32) | ((*x)<<32);
 }
-void generate_seeds(int number, uint64_t *result){
+void generate_gpu_seeds(int number, uint64_t **result){
+  int seed_bytes = number * sizeof(uint64_t);
+  uint64_t* seeds = (uint64_t*) malloc(seed_bytes);
+
   uint64_t x =0, w=0;
   for(int ii=0; ii<number; ii++){
-    result[ii] = msws(&x, &w);
+    seeds[ii] = msws(&x, &w);
   }
+  
+  cudaMalloc((void**) result, seed_bytes);
+  cudaMemcpy(*result, seeds, seed_bytes, cudaMemcpyHostToDevice);
+  free(seeds);
 }
 
 __device__ uint64_t xorshift128plus(uint64_t* sp) {
@@ -82,14 +89,8 @@ namespace rng{
     int blocks = HARDWARE.min_blocks_full_use;
     int par_threads = HARDWARE.min_threads_full_use;
 
-    int seed_bytes = 2* par_threads * sizeof(uint64_t);
     if(*d_rng_state == NULL) {
-      uint64_t *seeds;
-      seeds = (uint64_t*) malloc(seed_bytes);
-      generate_seeds(2*par_threads, seeds);
-      cudaMalloc((void**) d_rng_state, seed_bytes);
-      cudaMemcpy(*d_rng_state, seeds, seed_bytes, cudaMemcpyHostToDevice);
-      free(seeds);
+      generate_gpu_seeds(2*par_threads, d_rng_state);
     }
 
     int result_bytes = number * sizeof(double);
