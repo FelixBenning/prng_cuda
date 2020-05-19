@@ -87,7 +87,7 @@ __global__ void r_Exp(
 }
 
 namespace rng{
-  void gpu_r_exp(int number, double lambda, double** result, uint64_t **d_rng_state) {
+  double* gpu_r_exp(const int number, const double lambda, uint64_t **d_rng_state) {
     int threads_per_block = HARDWARE.min_threads_block_full_use;
     int blocks = HARDWARE.min_blocks_full_use;
     int par_threads = HARDWARE.min_threads_full_use;
@@ -97,7 +97,6 @@ namespace rng{
     }
 
     int result_bytes = number * sizeof(double);
-    *result = (double*) malloc(result_bytes);
 
     int cycles = number/par_threads;
     int residual_threads = number%par_threads;
@@ -107,7 +106,9 @@ namespace rng{
 
     r_Exp <<<blocks, threads_per_block>>> (cycles, residual_threads, lambda, *d_rng_state, d_result);
 
-    cudaMemcpy(*result, d_result, result_bytes, cudaMemcpyDeviceToHost);
+    double* result = (double*) malloc(result_bytes);
+    cudaMemcpy(result, d_result, result_bytes, cudaMemcpyDeviceToHost);
     cudaFree(d_result);
+    return result;
   }
 }

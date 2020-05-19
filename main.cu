@@ -24,10 +24,9 @@ int main(int argc, char *argv[]){
   int number = input_handler(argc, argv);
   double lambda = 2;
   
-  double *result;
   uint64_t *d_rng_state = NULL;
 
-  rng::gpu_r_exp(number, lambda, &result, &d_rng_state);
+  double *result =  rng::gpu_r_exp(number, lambda, &d_rng_state);
 
   test::statistical_exp_tests(result, number, lambda);
 

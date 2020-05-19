@@ -77,11 +77,10 @@ namespace bench {
       lambda
     );
 
-    double *result;
     struct timespec start[repeats], finish[repeats], diff[repeats];
     for(int ii=0; ii< repeats; ii++){
       clock_gettime( CLOCK_MONOTONIC, &start[ii]);
-      rng::gpu_r_exp(number, lambda, &result, gpu_rng_state);
+      rng::gpu_r_exp(number, lambda, gpu_rng_state);
       clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
 
       status_bar(ii, repeats);
@@ -90,7 +89,25 @@ namespace bench {
     }
     status_bar(repeats, repeats); printf("\n");
     display_statistics(diff, repeats);
-
-    free(result);
   }
+
+  void bench(
+    std::function<double*()> &funct_to_bench,
+    int repeats
+  )
+  {
+    struct timespec start[repeats], finish[repeats], diff[repeats];
+    for(int ii=0; ii< repeats; ii++){
+      clock_gettime( CLOCK_MONOTONIC, &start[ii]);
+      funct_to_bench();
+      clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
+
+      status_bar(ii, repeats);
+      diff[ii] = delta(start[ii], finish[ii]);
+      fflush(stdout);
+    }
+    status_bar(repeats, repeats); printf("\n");
+    display_statistics(diff, repeats);
+  }
+
 }
