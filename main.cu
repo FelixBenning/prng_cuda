@@ -25,6 +25,7 @@ int main(int argc, char *argv[]){
   double lambda = 2;
   
   uint64_t *d_rng_state = NULL;
+  RngState* rngState = new RngState(640);
 
   double *result =  rng::gpu_r_exp(number, lambda, &d_rng_state);
 
