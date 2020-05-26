@@ -67,8 +67,7 @@ namespace bench {
   void gpu_r_exp(
     int number,
     int repeats,
-    double lambda,
-    uint64_t** gpu_rng_state
+    double lambda
   )
   {
     printf(
@@ -80,7 +79,9 @@ namespace bench {
     struct timespec start[repeats], finish[repeats], diff[repeats];
     for(int ii=0; ii< repeats; ii++){
       clock_gettime( CLOCK_MONOTONIC, &start[ii]);
-      rng::gpu_r_exp(number, lambda, gpu_rng_state);
+      //***//
+      rng::gpu_r_exp(number, lambda);
+      //***//
       clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
 
       status_bar(ii, repeats);
@@ -92,7 +93,7 @@ namespace bench {
   }
 
   void bench(
-    std::function<double*()> &funct_to_bench,
+    const std::function<void()> &funct_to_bench,
     int repeats
   )
   {

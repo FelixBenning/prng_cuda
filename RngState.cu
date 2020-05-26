@@ -1,7 +1,7 @@
 #include "random.h"
 #include <assert.h>
 
-int RngState::size(){
+int RngState::size() const{
   return this->state_size;
 }
 
@@ -26,7 +26,7 @@ inline uint64_t msws(uint64_t* x, uint64_t* w){
 uint64_t* RngState::generate_gpu_seeds(int number){
   int seed_bytes = number * sizeof(uint64_t);
   uint64_t* seeds = (uint64_t*) malloc(seed_bytes);
-  //printf("seed address mod 64: %lu\n", (long unsigned) seeds % 64);
+  printf("seed address mod 64: %lu\n", (long unsigned) seeds % 64);
 
   uint64_t x =0, w=0;
   for(int ii=0; ii<number; ii++){
@@ -42,8 +42,8 @@ uint64_t* RngState::generate_gpu_seeds(int number){
 }
 
 RngState::RngState(int size) {
-  this->gpu_mem_loc = this->generate_gpu_seeds(size);
   this->state_size = size;
+  this->gpu_mem_loc = this->generate_gpu_seeds(size);
 }
 RngState::~RngState() {
   assert(!this->borrowed);

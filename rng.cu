@@ -1,39 +1,13 @@
 #include "random.h"
 #include<stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define LARGEST_U_INT64 0x1p64 //=2^64
-
-const Hardware HARDWARE = hardware::get();
 
 inline int round_up_division(int dividend, int divisor) {
   return 1+(1-dividend)/divisor;
 }
-
-//Middle Square Weyl Sequence PRNG for seeds (note that it is intended to return uint32_t)
-const uint64_t WEYL_CONST = 0xb5ad4eceda1ce2a9;
-
-inline static uint64_t msws(uint64_t* x, uint64_t* w){
- (*x) *= (*x);
- (*x) += ((*w) += WEYL_CONST);
- return (*x) = ((*x)>>32) | ((*x)<<32);
-}
-void generate_gpu_seeds(int number, uint64_t **result){
-  int seed_bytes = number * sizeof(uint64_t);
-  uint64_t* seeds = (uint64_t*) malloc(seed_bytes);
-  printf("seed address mod 64: %lu\n", (long unsigned) seeds % 64);
-
-  uint64_t x =0, w=0;
-  for(int ii=0; ii<number; ii++){
-    seeds[ii] = msws(&x, &w);
-  }
-  
-  cudaMalloc((void**) result, seed_bytes);
-  printf("device seeds address mod 64: %lu\n", (long unsigned) *result %64);
-  cudaMemcpy(*result, seeds, seed_bytes, cudaMemcpyHostToDevice);
-  free(seeds);
-}
-
 __device__ uint64_t xorshift128plus(uint64_t* sp) {
   uint64_t x = sp[0],
   y = sp[1];
@@ -87,14 +61,14 @@ __global__ void r_Exp(
 }
 
 namespace rng{
-  double* gpu_r_exp(const int number, const double lambda, uint64_t **d_rng_state) {
-    int threads_per_block = HARDWARE.min_threads_block_full_use;
-    int blocks = HARDWARE.min_blocks_full_use;
-    int par_threads = HARDWARE.min_threads_full_use;
+  double* gpu_r_exp(const int number, const double lambda) {
+    
+    Config* conf = new Config();
+    int threads_per_block = conf->threadsPerBlock(0); 
+    int blocks = conf->blocks(0);
+    int par_threads =conf->totalNumThreads(0); 
 
-    if(*d_rng_state == NULL) {
-      generate_gpu_seeds(2*par_threads, d_rng_state);
-    }
+    assert(rngState->size()>=2*par_threads);
 
     int result_bytes = number * sizeof(double);
 
@@ -104,7 +78,9 @@ namespace rng{
     double *d_result; 
     cudaMalloc((void**) &d_result, result_bytes);   
 
-    r_Exp <<<blocks, threads_per_block>>> (cycles, residual_threads, lambda, *d_rng_state, d_result);
+    uint64_t* rng_state_ptr = rngState->borrow();
+    r_Exp <<<blocks, threads_per_block>>> (cycles, residual_threads, lambda, rng_state_ptr, d_result);
+    rngState->unborrow(rng_state_ptr);
 
     double* result = (double*) malloc(result_bytes);
     cudaMemcpy(result, d_result, result_bytes, cudaMemcpyDeviceToHost);
