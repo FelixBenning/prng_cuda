@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-const int THREADS_PER_CORE = 2;
+const int THREADS_PER_CORE = 4;
 
 int Config::blocks(int device){
   return this->smCount(device) * THREADS_PER_CORE;

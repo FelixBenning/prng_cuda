@@ -39,8 +39,10 @@ int main(int argc, char *argv[]){
 
   test::statistical_exp_tests(result, number, lambda);
 
-  bench::gpu_r_exp((int) 10e6, 50, lambda);
+  printf("benchmark double\n");
   bench::bench([=]{free(rng::gpu_r_exp((int) 10e6, lambda));}, 50);
+  printf("benchmark float\n");
+  bench::bench([=]{free(rng::gpu_r_exp((int) 10e6, (float) lambda));}, 50);
 
   free(result);
   delete rngState;

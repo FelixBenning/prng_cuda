@@ -64,43 +64,15 @@ namespace bench {
       printf("]");
   }
 
-  void gpu_r_exp(
-    int number,
-    int repeats,
-    double lambda
-  )
-  {
-    printf(
-      "Benchmarking 'gpu_r_exp' generating %g RV with lambda = %g)'\n",
-      (float) number,
-      lambda
-    );
-
-    struct timespec start[repeats], finish[repeats], diff[repeats];
-    for(int ii=0; ii< repeats; ii++){
-      clock_gettime( CLOCK_MONOTONIC, &start[ii]);
-      //***//
-      rng::gpu_r_exp(number, lambda);
-      //***//
-      clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
-
-      status_bar(ii, repeats);
-      diff[ii] = delta(start[ii], finish[ii]);
-      fflush(stdout);
-    }
-    status_bar(repeats, repeats); printf("\n");
-    display_statistics(diff, repeats);
-  }
-
   void bench(
-    const std::function<void()> &funct_to_bench,
+    const std::function<void()> &callable,
     int repeats
   )
   {
     struct timespec start[repeats], finish[repeats], diff[repeats];
     for(int ii=0; ii< repeats; ii++){
       clock_gettime( CLOCK_MONOTONIC, &start[ii]);
-      funct_to_bench();
+      callable();
       clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
 
       status_bar(ii, repeats);
