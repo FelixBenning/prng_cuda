@@ -1,13 +1,17 @@
 #include "random.h"
 #include <stdio.h>
+#include <assert.h>
 
-const int THREADS_PER_CORE = 1;
+const int THREADS_PER_CORE = 2;
 
 int Config::blocks(int device){
   return this->smCount(device) * THREADS_PER_CORE;
 }
 int Config::threadsPerBlock(int device){
-  return this->warpPerSm(device) * this->threadsPerWarp(device) * THREADS_PER_CORE;
+  int threads = this->totalNumThreads(device);
+  int blocks = this->blocks(device);
+  assert(!(threads%blocks));
+  return threads/blocks;
 }
 int Config::totalNumThreads(int device){
   return this->cudaCores(device) * THREADS_PER_CORE;

@@ -1,5 +1,5 @@
 #include "random.h"
-#include<assert.h>
+#include <assert.h>
 #include<stdio.h>
 #include<cmath>
 
@@ -35,12 +35,12 @@ int main(int argc, char *argv[]){
   }
   rngState = new RngState(2*totalNumThreads);
 
-  double *result =  rng::gpu_r_exp(number, lambda);
+  double *result =  rng::gpu_r_exp<double>(number, lambda);
 
   test::statistical_exp_tests(result, number, lambda);
 
   bench::gpu_r_exp((int) 10e6, 50, lambda);
-  bench::bench([=](){rng::gpu_r_exp((int) 10e6, lambda);}, 50);
+  bench::bench([=]{free(rng::gpu_r_exp((int) 10e6, lambda));}, 50);
 
   free(result);
   delete rngState;

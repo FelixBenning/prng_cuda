@@ -44,7 +44,8 @@ class RngState {
 extern RngState* rngState;
 
 namespace rng {
-  double* gpu_r_exp(int number, const double lambda);
+  template<class T>
+  T* gpu_r_exp(int number, const T lambda);
 }
 
 namespace test {
