@@ -46,6 +46,9 @@ extern RngState* rngState;
 namespace rng {
   template<class T>
   T* gpu_r_exp(int number, const T lambda);
+
+  template<class T>
+  T* gpu_max_rv(const int number, const int maxOfN, const T lambda);
 }
 
 namespace test {
