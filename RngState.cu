@@ -26,7 +26,7 @@ inline uint64_t msws(uint64_t* x, uint64_t* w){
 uint64_t* RngState::generate_gpu_seeds(int number){
   int seed_bytes = number * sizeof(uint64_t);
   uint64_t* seeds = (uint64_t*) malloc(seed_bytes);
-  printf("seed address mod 64: %lu\n", (long unsigned) seeds % 64);
+  //printf("seed address mod 64: %lu\n", (long unsigned) seeds % 64);
 
   uint64_t x =0, w=0;
   for(int ii=0; ii<number; ii++){
@@ -35,7 +35,7 @@ uint64_t* RngState::generate_gpu_seeds(int number){
 
   uint64_t* result;
   cudaMalloc((void**) &result, seed_bytes);
-  //printf("device seeds address mod 64: %lu\n", (long unsigned) *result %64);
+  printf("device seeds address mod 64: %lu\n", (long unsigned) result %64);
   cudaMemcpy(result, seeds, seed_bytes, cudaMemcpyHostToDevice);
   free(seeds);
   return result;

@@ -29,7 +29,6 @@ namespace rng{
   __device__ double pseudInv_exp(double lambda, double unif_rv){
     return -lambda*log(unif_rv);
   }
-
   __device__ float pseudInv_exp(float lambda, double unif_rv){
     return -lambda*logf(unif_rv);
   }
@@ -39,7 +38,7 @@ namespace rng{
   }
 
   template<class T>
-    __device__ T composed_custom(T lambda, uint64_t* seed){
+    __device__ T composed_rv(T lambda, uint64_t* seed){
       return custom_rv(pseudInv_exp(lambda, r_unif(seed)));
     }
 
@@ -76,20 +75,43 @@ namespace rng{
       seed_slice[1]=local_seed[1];
     }
 
-  __device__ float generate_max(const int maxOfN, float lambda,  uint64_t* seed){
+  __device__ float generate_max(const int maxOfN, const float lambda,  uint64_t* seed){
     float runningMax = logf(0);
     for(int ii=0; ii<maxOfN; ii++){
-      runningMax = fmaxf(composed_custom(lambda, seed), runningMax);
+      runningMax = fmaxf(composed_rv(lambda, seed), runningMax);
     }
     return runningMax;
   }
 
+  __device__ void warp_coop_max(
+    const int coopNum,
+    const int thread_id,
+    const int maxOfN,
+    const float lambda,
+    uint64_t* seed,
+    float* result
+  ) {
+    int maxNum = maxOfN/coopNum + ((thread_id%coopNum < maxOfN%coopNum) ? 1 : 0); 
+    float local_result = generate_max(maxNum, lambda, seed);
+
+    if(thread_id%coopNum == 0){
+      result[thread_id/coopNum] = local_result;
+    } else{
+      for(int ii=1; ii<coopNum; ii++){
+        if(thread_id%coopNum == ii){
+          result[thread_id/coopNum] = fmaxf(result[thread_id/coopNum], local_result);
+        }
+      }
+    }
+    
+  }
+
   template<class T>
     __global__ void max_rv(
-      int number,
-      int threadTotal,
-      int maxOfN,
-      T lambda,
+      const int number,
+      const int threadTotal,
+      const int maxOfN,
+      const T lambda,
       uint64_t* seeds,
       T* result
       )
@@ -97,50 +119,27 @@ namespace rng{
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     uint64_t* seed_slice = seeds+2*idx;
     uint64_t local_seed[2] = {seed_slice[0], seed_slice[1]};
-    T* result_slice = result + idx*number;
     int cycle = number/threadTotal;
+    T* result_slice = result + idx*cycle;
     while(cycle--){
       result_slice[cycle] = generate_max(maxOfN, lambda, local_seed);
     }
 
-    int warpSize = 64;
+    int warpSize = 32;
 
     result_slice = result + cycle*threadTotal;
     int residual = number%threadTotal;
     for(int ii=2; ii<= warpSize; ii=ii<<1){
       if(residual>=threadTotal/ii){
         residual -= threadTotal/ii;
-
-        int maxOfn = maxOfN/ii + ((idx%ii < maxOfN%ii) ? 1 : 0); 
-        float local_result = generate_max(maxOfn, lambda, local_seed);
-        //Since ii<=warpsize the order is determined as the threads within a warp can only advance together
-        if(idx%ii){
-          result_slice[idx/ii] = local_result;
-        } else {
-          for(int jj = 1; jj<ii; jj++){
-            if(jj == idx%ii){
-              result_slice[idx/ii] = fmaxf(result_slice[idx/ii], local_result);
-            }
-          }
-        }
+        warp_coop_max(ii, idx, maxOfN, lambda, local_seed, result_slice);
         result_slice += threadTotal/ii;
       }
     }
 
     //now residual<threadTotal/warpSize
     if(idx/warpSize /*warpIndex*/ < residual){
-        int maxOfn = maxOfN/warpSize + ((idx%warpSize < maxOfN%warpSize) ? 1 : 0); 
-        float local_result = generate_max(maxOfn, lambda, local_seed);
-        //the order is determined as the threads within a warp can only advance together
-        if(idx%warpSize){
-          result_slice[idx/warpSize] = local_result;
-        } else {
-          for(int jj = 1; jj<warpSize; jj++){
-            if(jj == idx%warpSize){
-              result_slice[idx/warpSize] = fmaxf(result_slice[idx/warpSize], local_result);
-            }
-          }
-        }
+        warp_coop_max(warpSize, idx, maxOfN, lambda, local_seed, result_slice);
     }
 
     seed_slice[0] = local_seed[0];

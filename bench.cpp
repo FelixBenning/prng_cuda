@@ -3,13 +3,17 @@
 #include <time.h>
 #include <stdio.h>
 
-#define NSEC_PER_SEC 1000000000.0;
+#define NSEC_PER_SEC 1000000000.0
 
 namespace bench {
   inline timespec delta(timespec start, timespec finish){
     timespec result; 
-    result.tv_sec = finish.tv_sec - start.tv_sec;
-    result.tv_nsec = finish.tv_nsec - start.tv_nsec;
+    bool carry = finish.tv_nsec < start.tv_nsec;
+    result.tv_sec = finish.tv_sec - start.tv_sec - (int) carry;
+    result.tv_nsec = 
+      carry ? 
+        NSEC_PER_SEC - (start.tv_nsec - finish.tv_nsec) 
+        : finish.tv_nsec - start.tv_nsec;
     return result;
   }
   bool smaller(timespec left, timespec right) {
@@ -37,7 +41,9 @@ namespace bench {
       sum_sec += diffs[ii].tv_sec;
       if(smaller(diffs[ii], min)){
         min = diffs[ii];
-      } if(smaller(max, diffs[ii])) {
+      }
+      
+      if(smaller(max, diffs[ii])) {
         max = diffs[ii];
       }
     }
@@ -71,13 +77,14 @@ namespace bench {
   {
     struct timespec start[repeats], finish[repeats], diff[repeats];
     for(int ii=0; ii< repeats; ii++){
+      status_bar(ii, repeats);
+      fflush(stdout);
+
       clock_gettime( CLOCK_MONOTONIC, &start[ii]);
       callable();
       clock_gettime(CLOCK_MONOTONIC, &finish[ii]);
 
-      status_bar(ii, repeats);
       diff[ii] = delta(start[ii], finish[ii]);
-      fflush(stdout);
     }
     status_bar(repeats, repeats); printf("\n");
     display_statistics(diff, repeats);
